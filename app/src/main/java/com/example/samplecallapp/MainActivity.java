@@ -1,10 +1,10 @@
 package com.example.samplecallapp;
 
 import android.Manifest;
+import android.app.ActivityManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -24,7 +24,6 @@ import androidx.activity.EdgeToEdge;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -33,8 +32,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class MainActivity extends AppCompatActivity {
     private Button button;
@@ -42,6 +39,7 @@ public class MainActivity extends AppCompatActivity {
     private Map<Integer, Integer> simMap;
     private ArrayList<String> simNames;
     private ArrayList<Integer> slotIndex;
+    private EditText editText;
     String[] permissions = new String[]{
             Manifest.permission.CALL_PHONE,
             Manifest.permission.READ_PHONE_STATE,
@@ -50,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
     TelephonyManager manager;
     TelephonyManager.UssdResponseCallback callback;
     Handler handler;
+    DBHelper helper;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,6 +60,7 @@ public class MainActivity extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+        helper = new DBHelper(this);
 
 
         simMap = new HashMap<>();
@@ -69,52 +69,105 @@ public class MainActivity extends AppCompatActivity {
 
         button = findViewById(R.id.callNumber);
         spinner = findViewById(R.id.selectSim);
+        editText = findViewById(R.id.getUssd);
 
         listSimInfo();
-
         manager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            callback = new TelephonyManager.UssdResponseCallback() {
-                @Override
-                public void onReceiveUssdResponse(TelephonyManager telephonyManager, String request, CharSequence response) {
-                    super.onReceiveUssdResponse(telephonyManager, request, response);
-                    Toast.makeText(MainActivity.this, response, Toast.LENGTH_SHORT).show();
-                }
 
-                @Override
-                public void onReceiveUssdResponseFailed(TelephonyManager telephonyManager, String request, int failureCode) {
-                    super.onReceiveUssdResponseFailed(telephonyManager, request, failureCode);
-                }
-            };
-        }
-        handler = new Handler(Looper.getMainLooper()) {
+        findViewById(R.id.checkTransactions).setOnClickListener(new View.OnClickListener() {
             @Override
-            public void handleMessage(@NonNull Message msg) {
-                super.handleMessage(msg);
+            public void onClick(View v) {
+                startActivity(new Intent(MainActivity.this, ResponsesActivity.class));
             }
-        };
+        });
+
+        findViewById(R.id.executeFailed).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (myService()) {
+                    // If the service is running, stop it
+                    Intent intent = new Intent(MainActivity.this, MyService.class);
+                    stopService(intent);
+                } else {
+                    // If the service is not running, start it
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        Intent intent = new Intent(MainActivity.this, MyService.class);
+                        startForegroundService(intent);
+                    }
+                }
+            }
+        });
+//        if (!myService()){
+//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+//                Intent intent = new Intent(MainActivity.this, MyService.class);
+//                startForegroundService(intent);
+//            }
+//        }
+
+
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
-                    ActivityCompat.requestPermissions(MainActivity.this,new String[]{Manifest.permission.CALL_PHONE},101);
+                    ActivityCompat.requestPermissions(MainActivity.this, new String[]{Manifest.permission.CALL_PHONE}, 101);
                     return;
                 }
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     String dialSim1;
                     int subscriptionId = 0;
                     dialSim1 = spinner.getSelectedItem().toString();
-                    if (dialSim1.contains("SIM: 1")){
+                    if (dialSim1.contains("SIM: 1")) {
                         subscriptionId = simMap.get(0);
-                    }else if(dialSim1.contains("SIM: 2")){
+                    } else if (dialSim1.contains("SIM: 2")) {
                         subscriptionId = simMap.get(1);
                     }
-                    manager.createForSubscriptionId(subscriptionId).sendUssdRequest("*100*4*1*1#",callback,handler);
-
+                    String ussdRequest = editText.getText().toString();
+                    dialUssdCode(ussdRequest,subscriptionId);
                 }
             }
         });
 
+    }
+
+    private void dialUssdCode(String ussdRequest, int subscriptionId) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            callback = new TelephonyManager.UssdResponseCallback() {
+                @Override
+                public void onReceiveUssdResponse(TelephonyManager telephonyManager, String request, CharSequence response) {
+                    super.onReceiveUssdResponse(telephonyManager, request, response);
+                    Toast.makeText(MainActivity.this, response, Toast.LENGTH_SHORT).show();
+                    insertResponse(response.toString(),"*100*4*1*1#",subscriptionId);
+                }
+
+                @Override
+                public void onReceiveUssdResponseFailed(TelephonyManager telephonyManager, String request, int failureCode) {
+                    super.onReceiveUssdResponseFailed(telephonyManager, request, failureCode);
+                    insertResponse("Failed with the following error: "+String.valueOf(failureCode),"*100*4*1*1#",subscriptionId);
+                }
+            };
+            handler = new Handler(Looper.getMainLooper()) {
+                @Override
+                public void handleMessage(@NonNull Message msg) {
+                    super.handleMessage(msg);
+                }
+            };
+        }
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createForSubscriptionId(subscriptionId).sendUssdRequest(ussdRequest, callback, handler);
+        }
+    }
+
+    public void insertResponse(String response,String ussdCode, int subscriptionId){
+        boolean checkInsertData = helper.insertResponse(response, ussdCode, subscriptionId);
+        if (checkInsertData){
+            Toast.makeText(this, "response added successfully", Toast.LENGTH_SHORT).show();
+        }
+        else{
+            Toast.makeText(this, "Insertion unsuccessful", Toast.LENGTH_SHORT).show();
+        }
     }
 
     public void listSimInfo(){
@@ -142,6 +195,17 @@ public class MainActivity extends AppCompatActivity {
                 listSimInfo();
             }
         }
+    }
+
+    public boolean myService(){
+        ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+        for (ActivityManager.RunningServiceInfo info :
+                manager.getRunningServices(Integer.MAX_VALUE)) {
+            if (MyService.class.getName().equalsIgnoreCase(info.service.getClassName())){
+                return true;
+            }
+        }
+        return false;
     }
 
 
