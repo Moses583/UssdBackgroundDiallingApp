@@ -58,7 +58,6 @@ public class MyService extends Service {
                             Log.d(TAG,"queue is empty");
                             deleteData();
                             stopSelf();
-
                         }
                         else{
                             UssdResponse response = queue.poll();
