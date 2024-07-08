@@ -37,7 +37,6 @@ public class ResponsesActivity extends AppCompatActivity {
         responseList = new ArrayList<>();
         adapter = new UssdAdapter(this);
         helper = new DBHelper(this);
-
         showData();
     }
 
@@ -63,7 +62,7 @@ public class ResponsesActivity extends AppCompatActivity {
         adapter = new UssdAdapter(this);
         adapter.setResponseList(getResponses());
         recyclerView.setAdapter(adapter);
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerView.setLayoutManager(new LinearLayoutManager(this,LinearLayoutManager.HORIZONTAL,false));
         recyclerView.setHasFixedSize(true);
     }
 }

@@ -97,12 +97,6 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
-//        if (!myService()){
-//            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-//                Intent intent = new Intent(MainActivity.this, MyService.class);
-//                startForegroundService(intent);
-//            }
-//        }
 
 
         button.setOnClickListener(new View.OnClickListener() {
