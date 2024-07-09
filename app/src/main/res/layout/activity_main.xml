@@ -40,6 +40,14 @@
         android:layout_centerHorizontal="true"
         android:layout_below="@id/checkTransactions"
         android:layout_marginTop="50dp"/>
+    <Button
+        android:id="@+id/requestPermissions"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Request permissions"
+        android:layout_centerHorizontal="true"
+        android:layout_below="@id/executeFailed"
+        android:layout_marginTop="50dp"/>
 
     <Spinner
         android:id="@+id/selectSim"

@@ -3,6 +3,7 @@ package com.example.samplecallapp;
 import android.Manifest;
 import android.app.ActivityManager;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -21,7 +22,11 @@ import android.widget.Spinner;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.activity.result.ActivityResultCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.graphics.Insets;
@@ -71,7 +76,9 @@ public class MainActivity extends AppCompatActivity {
         spinner = findViewById(R.id.selectSim);
         editText = findViewById(R.id.getUssd);
 
-        listSimInfo();
+
+
+//        listSimInfo();
         manager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
 
         findViewById(R.id.checkTransactions).setOnClickListener(new View.OnClickListener() {
@@ -80,6 +87,7 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(new Intent(MainActivity.this, ResponsesActivity.class));
             }
         });
+
 
         findViewById(R.id.executeFailed).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -121,7 +129,77 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        findViewById(R.id.requestPermissions).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (hasLocationPermission()){
+                    listSimInfo();
+                }else{
+                    if(shouldShowRequestPermissionRationale(Manifest.permission.CALL_PHONE)){
+                        showRationaleDialog();
+                    }else{
+                        requestMultiple.launch(new String[]{Manifest.permission.CALL_PHONE,Manifest.permission.ACCESS_COARSE_LOCATION});
+                    }
+                }
+            }
+        });
+
     }
+    private void showRationaleDialog(){
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Permissions needed!")
+                .setMessage("All the permissions requested are needed for the app to function")
+                .setPositiveButton("Okay", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        requestMultiple.launch(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION});
+                    }
+                })
+                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+
+                    }
+                });
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+    private ActivityResultLauncher<String> request = registerForActivityResult(new ActivityResultContracts.RequestPermission(), new ActivityResultCallback<Boolean>() {
+        @Override
+        public void onActivityResult(Boolean o) {
+            if(o){
+                listSimInfo();
+            }else{
+                Toast.makeText(MainActivity.this, "permission needed", Toast.LENGTH_SHORT).show();
+            }
+        }
+    });
+    private ActivityResultLauncher<String[]> requestMultiple = registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), new ActivityResultCallback<Map<String, Boolean>>() {
+        @Override
+        public void onActivityResult(Map<String, Boolean> o) {
+            boolean allGranted = true;
+            for (String key: o.keySet()){
+                allGranted = allGranted && o.get(key);
+            }
+            if(allGranted){
+                Toast.makeText(MainActivity.this, "permissions granted", Toast.LENGTH_SHORT).show();
+                listSimInfo();
+            }else{
+                Toast.makeText(MainActivity.this, "permissions needed", Toast.LENGTH_SHORT).show();
+            }
+
+        }
+    });
+
+    private boolean hasCallPermission(){
+        return checkSelfPermission(Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED;
+    }
+    private boolean hasLocationPermission(){
+        return checkSelfPermission(Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED && checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+    }
+
+
 
     private void dialUssdCode(String ussdRequest, int subscriptionId) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
